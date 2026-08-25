@@ -170,6 +170,11 @@ object NetAddr {
         cachedLocals = null
     }
 
+    private fun isClatSynthetic(addr: Inet4Address): Boolean {
+        val b = addr.address
+        return b[0] == 192.toByte() && b[1] == 0.toByte() && b[2] == 0.toByte() && (b[3].toInt() and 0xF8) == 0
+    }
+
     fun localAddresses(): List<Local> {
         val now = System.currentTimeMillis()
         cachedLocals?.let { if (now - cachedLocalsAt < SCAN_CACHE_MS) return it }
@@ -184,6 +189,7 @@ object NetAddr {
                 ) return@forEach
                 iface.inetAddresses.toList().forEach { addr ->
                     if (addr.isLoopbackAddress || addr.isMulticastAddress) return@forEach
+                    if (addr is Inet4Address && isClatSynthetic(addr)) return@forEach
                     out.add(Local(addr, iface.name ?: name, score(addr)))
                 }
             }
@@ -252,7 +258,7 @@ object NetAddr {
     }
 
     fun interfaceHasV4(iface: NetworkInterface): Boolean = runCatching {
-        iface.inetAddresses.toList().any { it is Inet4Address && !it.isLoopbackAddress }
+        iface.inetAddresses.toList().any { it is Inet4Address && !it.isLoopbackAddress && !isClatSynthetic(it)}
     }.getOrDefault(false)
 
     fun interfaceHasV6(iface: NetworkInterface): Boolean = runCatching {
